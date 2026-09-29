@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import type { ChatMessageType, ScenarioInput, SessionScenario, TestScenario } from '@/api/client';
+import type {
+  ChatMessageType,
+  ScenarioChannel,
+  ScenarioInput,
+  SessionScenario,
+  TestScenario,
+} from '@/api/client';
 
 export const E164 = /^\+[1-9]\d{6,14}$/;
 
@@ -20,6 +26,8 @@ export const scenarioFieldsSchema = z.object({
     .int('Whole numbers only')
     .min(2, 'At least 2')
     .max(30, 'At most 30'),
+  /** SMS only: wait for the bot to text first. */
+  bot_starts: z.boolean(),
 });
 
 export type ScenarioFieldValues = z.infer<typeof scenarioFieldsSchema>;
@@ -30,6 +38,7 @@ export const EMPTY_SCENARIO_FIELDS: ScenarioFieldValues = {
   goal: '',
   checks: [{ value: '' }],
   max_turns: 10,
+  bot_starts: false,
 };
 
 export function toScenarioFields(s: SessionScenario): ScenarioFieldValues {
@@ -40,17 +49,28 @@ export function toScenarioFields(s: SessionScenario): ScenarioFieldValues {
     goal: s.goal ?? '',
     checks: checks.length ? checks : [{ value: '' }],
     max_turns: s.max_turns ?? 10,
+    bot_starts: s.bot_starts === true,
   };
 }
 
-export function fromScenarioFields(v: ScenarioFieldValues): TestScenario {
+/** Scenario payload for start_test. `bot_starts: true` is only sent for SMS. */
+export function fromScenarioFields(
+  v: ScenarioFieldValues,
+  channel?: ScenarioChannel,
+): TestScenario {
   return {
     name: v.name.trim(),
     persona: v.persona.trim(),
     goal: v.goal.trim(),
     checks: v.checks.map((c) => c.value.trim()).filter(Boolean),
     max_turns: v.max_turns,
+    ...(v.bot_starts && channel === 'sms' ? { bot_starts: true as const } : {}),
   };
+}
+
+/** bot_starts only applies to SMS (and "any" scenarios, which can run on SMS). */
+export function botStartsApplies(channel: ScenarioChannel): boolean {
+  return channel === 'sms' || channel === 'any';
 }
 
 // ---------- Run form ----------
@@ -104,5 +124,10 @@ export const scenarioFormSchema = scenarioFieldsSchema.extend({
 export type ScenarioFormValues = z.infer<typeof scenarioFormSchema>;
 
 export function toScenarioInput(v: ScenarioFormValues, id?: number): ScenarioInput {
-  return { ...fromScenarioFields(v), channel: v.channel, ...(id ? { id } : {}) };
+  return {
+    ...fromScenarioFields(v),
+    channel: v.channel,
+    bot_starts: botStartsApplies(v.channel) && v.bot_starts,
+    ...(id ? { id } : {}),
+  };
 }

@@ -41,6 +41,8 @@ export interface SessionScenario {
   goal?: string;
   checks?: string[];
   max_turns?: number;
+  /** SMS only: the bot sends the first message (e.g. a form-triggered workflow). */
+  bot_starts?: boolean;
 }
 
 export interface Session {
@@ -76,6 +78,7 @@ export interface Scenario {
   goal: string;
   checks: string[];
   max_turns: number;
+  bot_starts?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +91,7 @@ export interface TestScenario {
   goal: string;
   checks: string[];
   max_turns: number;
+  bot_starts?: true;
 }
 
 export interface SmsTarget {
@@ -118,7 +122,6 @@ export interface StartTestResult {
 
 /** Maps each action to its request payload and response data. */
 export interface ApiActions {
-  ping: { req: Record<string, never>; res: { ok: true; time: string; email: string } };
   list_sessions: { req: { channel?: '' | Channel; limit?: number }; res: SessionRow[] };
   get_session: { req: { id: number }; res: SessionDetail | null };
   abort_session: { req: { id: number }; res: { aborted: 0 | 1 } };

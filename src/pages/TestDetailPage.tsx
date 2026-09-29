@@ -7,6 +7,7 @@ import {
   Copy,
   ExternalLink,
   FileQuestion,
+  MessageSquare,
   Phone,
   RotateCcw,
   Square,
@@ -331,11 +332,14 @@ function JudgeReport({ session }: { session: Session }) {
 }
 
 function ScenarioCard({ session }: { session: Session }) {
-  const { persona, goal } = session.scenario;
+  const { persona, goal, bot_starts } = session.scenario;
   if (!persona && !goal) return null;
   return (
     <Card>
-      <CardHeader title="Scenario" />
+      <CardHeader
+        title="Scenario"
+        description={bot_starts ? 'The bot sends the first message.' : undefined}
+      />
       <div className="space-y-4 px-4 py-4 sm:px-5">
         {persona && (
           <Section title="Persona">
@@ -382,6 +386,8 @@ function Conversation({ session, messages, running }: ConversationProps) {
   }, [messages.length, running]);
 
   const voiceLive = running && session.channel === 'voice';
+  const awaitingBotOpener =
+    running && messages.length === 0 && session.scenario.bot_starts === true;
   const last = messages[messages.length - 1];
 
   return (
@@ -412,6 +418,11 @@ function Conversation({ session, messages, running }: ConversationProps) {
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
             <Phone className="size-5 animate-pulse text-accent-500" aria-hidden />
             Call in progress — the transcript arrives when the call ends.
+          </div>
+        ) : awaitingBotOpener ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <MessageSquare className="size-5 animate-pulse text-accent-500" aria-hidden />
+            Waiting for the bot's first message…
           </div>
         ) : running ? (
           <TypingIndicator who={last?.role === 'tester' ? 'bot' : 'tester'} />

@@ -6,6 +6,7 @@ import { Globe, MessageSquare, Phone, Play, Save } from 'lucide-react';
 import type { Channel, StartTestInput } from '@/api/client';
 import { useSaveScenario, useScenarios, useStartTest } from '@/api/hooks';
 import { PageHeader } from '@/components/Layout';
+import { BotStartsCheckbox } from '@/components/BotStartsCheckbox';
 import { ScenarioFields } from '@/components/ScenarioFields';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
@@ -47,7 +48,7 @@ function buildDefaults(prefill?: RunPrefill): RunFormValues {
 }
 
 function toStartInput(v: RunFormValues): StartTestInput {
-  const scenario = fromScenarioFields(v);
+  const scenario = fromScenarioFields(v, v.channel);
   switch (v.channel) {
     case 'sms':
       return {
@@ -109,7 +110,11 @@ function RunForm({ prefill }: { prefill?: RunPrefill }) {
     }
     const values = form.getValues();
     saveScenario.mutate(
-      { ...fromScenarioFields(values), channel: values.channel },
+      {
+        ...fromScenarioFields(values),
+        channel: values.channel,
+        bot_starts: values.channel === 'sms' && values.bot_starts,
+      },
       { onSuccess: (s) => toast.success(`Saved scenario "${s?.name ?? values.name}"`) },
     );
   }
@@ -256,6 +261,7 @@ function TargetFields({ channel }: { channel: Channel }) {
           placeholder="+15550002222"
           hint="The client's GHL number the bot answers on."
         />
+        <BotStartsCheckbox className="sm:col-span-2" />
       </div>
     );
   }

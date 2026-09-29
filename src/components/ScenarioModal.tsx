@@ -1,7 +1,8 @@
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { Scenario } from '@/api/client';
 import { useSaveScenario } from '@/api/hooks';
+import { BotStartsCheckbox } from '@/components/BotStartsCheckbox';
 import { ScenarioFields } from '@/components/ScenarioFields';
 import { Button } from '@/components/ui/Button';
 import { Field, Select } from '@/components/ui/Field';
@@ -10,6 +11,7 @@ import { useToast } from '@/components/ui/Toast';
 import { CHANNEL_LABEL } from '@/lib/format';
 import {
   EMPTY_SCENARIO_FIELDS,
+  botStartsApplies,
   scenarioFormSchema,
   toScenarioFields,
   toScenarioInput,
@@ -49,6 +51,8 @@ function ScenarioForm({ scenario, onDone }: { scenario: Scenario | null; onDone:
     mode: 'onTouched',
   });
 
+  const channel = useWatch({ control: form.control, name: 'channel' });
+
   const onSubmit = form.handleSubmit((values) => {
     save.mutate(toScenarioInput(values, scenario?.id), {
       onSuccess: (saved) => {
@@ -84,6 +88,7 @@ function ScenarioForm({ scenario, onDone }: { scenario: Scenario | null; onDone:
             </Select>
           )}
         </Field>
+        {botStartsApplies(channel) && <BotStartsCheckbox />}
         <ScenarioFields />
         <div className="flex justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <Button onClick={onDone}>Cancel</Button>

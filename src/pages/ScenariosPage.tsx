@@ -192,6 +192,7 @@ function ScenarioCard({ scenario: s, onUse, onEdit, onDelete }: CardProps) {
       <div className="mt-auto flex items-center justify-between gap-2 pt-4">
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
           {checks} {checks === 1 ? 'check' : 'checks'} · {s.max_turns} msgs
+          {s.bot_starts && ' · bot starts'}
         </span>
         <Button size="sm" icon={<Play className="size-3.5" aria-hidden />} onClick={onUse}>
           Use
