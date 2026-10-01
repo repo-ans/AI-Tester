@@ -10,6 +10,7 @@ import type {
   SessionRow,
   StartTestInput,
   StartTestResult,
+  TeamSettings,
 } from './types';
 
 export * from './types';
@@ -110,6 +111,14 @@ type Handlers = {
 
 const SESSION_COLUMNS =
   'id, channel, status, turns, scenario, result, tester_number, bot_number, external_ref, created_at, finished_at';
+const SETTINGS_COLUMNS =
+  'sms_tester_number, voice_from_number, voice_tester_agent_id, chat_location_id, updated_at, updated_by';
+const EMPTY_SETTINGS: TeamSettings = {
+  sms_tester_number: '',
+  voice_from_number: '',
+  voice_tester_agent_id: '',
+  chat_location_id: '',
+};
 const SCENARIO_COLUMNS =
   'id, channel, name, persona, goal, checks, max_turns, bot_starts, created_at, updated_at';
 
@@ -175,6 +184,29 @@ const handlers: Handlers = {
     const res = await supabase.from('ai_test_scenarios').delete().eq('id', id).select('id');
     const rows = unwrap(res) as Array<{ id: number }>;
     return { deleted: rows.length > 0 ? 1 : 0 };
+  },
+
+  async get_settings() {
+    const res = await supabase
+      .from('ai_test_settings')
+      .select(SETTINGS_COLUMNS)
+      .eq('id', 1)
+      .maybeSingle();
+    return (unwrap(res) as TeamSettings | null) ?? EMPTY_SETTINGS;
+  },
+
+  async save_settings({ settings }) {
+    const { data } = await supabase.auth.getSession();
+    const res = await supabase
+      .from('ai_test_settings')
+      .update({ ...settings, updated_by: data.session?.user.email ?? null })
+      .eq('id', 1)
+      .select(SETTINGS_COLUMNS)
+      .maybeSingle();
+    const saved = unwrap(res) as TeamSettings | null;
+    // No row back = the settings table/row is missing (setup SQL not run).
+    if (!saved) throw new ApiError(`Team settings are not set up yet. ${SETUP_HINT}`);
+    return saved;
   },
 };
 

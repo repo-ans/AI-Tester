@@ -98,3 +98,39 @@ end $$;
 
 revoke all on function public.abort_test_session(bigint) from public, anon;
 grant execute on function public.abort_test_session(bigint) to authenticated;
+
+-- 5. Team-wide test defaults (one shared row) ------------------------------
+-- Our own numbers/IDs, set once in the dashboard's Settings page and used to
+-- pre-fill every Run test form for every user.
+
+create table if not exists public.ai_test_settings (
+  id                     int  primary key default 1 check (id = 1),
+  sms_tester_number      text not null default '',
+  voice_from_number      text not null default '',
+  voice_tester_agent_id  text not null default '',
+  chat_location_id       text not null default '',
+  updated_at             timestamptz not null default now(),
+  updated_by             text
+);
+
+insert into public.ai_test_settings (id, sms_tester_number, voice_from_number)
+values (1, '+14375293053', '+14389059929')
+on conflict (id) do nothing;
+
+alter table public.ai_test_settings enable row level security;
+
+drop policy if exists "dashboard read settings" on public.ai_test_settings;
+create policy "dashboard read settings" on public.ai_test_settings
+  for select to authenticated using (true);
+
+drop policy if exists "dashboard update settings" on public.ai_test_settings;
+create policy "dashboard update settings" on public.ai_test_settings
+  for update to authenticated using (true) with check (true);
+
+revoke all on public.ai_test_settings from anon;
+grant select, update on public.ai_test_settings to authenticated;
+
+drop trigger if exists ai_test_settings_touch on public.ai_test_settings;
+create trigger ai_test_settings_touch
+  before update on public.ai_test_settings
+  for each row execute function public.ai_test_touch_updated_at();

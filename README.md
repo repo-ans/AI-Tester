@@ -72,7 +72,9 @@ You can safely run it again. It:
   scenarios. Signed-out visitors with the anon key get nothing,
 - adds the `ai_test_session_list` view the Results page reads,
 - adds the `abort_test_session` function the **Stop test** button calls. Users can't edit test
-  results directly.
+  results directly,
+- creates `ai_test_settings`, the one shared row of team test defaults, pre-filled with the SMS
+  tester and voice "from" numbers.
 
 n8n connects with its Postgres credential, which bypasses row-level security, so the workflows keep
 working unchanged.
@@ -178,9 +180,11 @@ active.
 
 ## What is kept in the browser
 
-- **In n8n / Supabase:** users, tests, messages, judge results and scenarios.
-- **In this browser (localStorage):** the Supabase session, the Settings defaults, the last
-  channel and targets you used, and the theme.
+- **In n8n / Supabase:** users, tests, messages, judge results, scenarios, and the team test
+  defaults (`ai_test_settings`: SMS tester number, voice "from" number, Retell tester agent ID,
+  GHL location ID). Anyone signed in can change the defaults in Settings, and they apply to everyone.
+- **In this browser (localStorage):** the Supabase session, the last channel and bot numbers you
+  used, and the theme.
 
 ## Project layout
 

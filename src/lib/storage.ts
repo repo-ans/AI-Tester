@@ -1,4 +1,4 @@
-import type { Channel, ChatMessageType } from '@/api/client';
+import type { Channel, ChatMessageType, TeamSettings } from '@/api/client';
 
 /** Safe JSON localStorage helpers (storage can throw in private mode). */
 export function readJson<T>(key: string, fallback: T): T {
@@ -17,26 +17,6 @@ export function writeJson(key: string, value: unknown) {
     /* ignore */
   }
 }
-
-// ---------- Settings defaults ----------
-
-export interface Defaults {
-  sms_tester_number: string;
-  voice_from_number: string;
-  voice_tester_agent_id: string;
-  chat_location_id: string;
-}
-
-const DEFAULTS_KEY = 'abt.defaults';
-const EMPTY_DEFAULTS: Defaults = {
-  sms_tester_number: '',
-  voice_from_number: '',
-  voice_tester_agent_id: '',
-  chat_location_id: '',
-};
-
-export const getDefaults = () => readJson(DEFAULTS_KEY, EMPTY_DEFAULTS);
-export const saveDefaults = (d: Defaults) => writeJson(DEFAULTS_KEY, d);
 
 // ---------- Last used channel + targets on the Run page ----------
 
@@ -76,11 +56,10 @@ export function getLastRun(): LastRun {
 export const saveLastRun = (r: LastRun) => writeJson(LAST_RUN_KEY, r);
 
 /**
- * Initial target values: Settings defaults win for "our side" fields when set,
- * otherwise the values used last time in this browser.
+ * Initial target values: the team's shared Settings win for "our side" fields
+ * when set; the client's side (bot number etc.) comes from this browser's last run.
  */
-export function initialTargets(): TargetValues {
-  const d = getDefaults();
+export function initialTargets(d: TeamSettings): TargetValues {
   const last = getLastRun().targets;
   return {
     ...last,

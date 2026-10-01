@@ -3,14 +3,15 @@ import { FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Globe, MessageSquare, Phone, Play, Save } from 'lucide-react';
-import type { Channel, StartTestInput } from '@/api/client';
-import { useSaveScenario, useScenarios, useStartTest } from '@/api/hooks';
+import type { Channel, StartTestInput, TeamSettings } from '@/api/client';
+import { useSaveScenario, useScenarios, useStartTest, useTeamSettings } from '@/api/hooks';
 import { PageHeader } from '@/components/Layout';
 import { BotStartsCheckbox } from '@/components/BotStartsCheckbox';
 import { ScenarioFields } from '@/components/ScenarioFields';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/components/ui/Toast';
 import { CHANNEL_LABEL, cn } from '@/lib/format';
 import { isRunPrefill, type RunPrefill } from '@/lib/prefill';
@@ -34,12 +35,32 @@ import {
 export function RunPage() {
   const location = useLocation();
   const prefill = isRunPrefill(location.state) ? location.state.prefill : undefined;
+  const settings = useTeamSettings();
+  // Wait for the team's shared numbers so the form starts filled in.
+  if (settings.isPending) return <RunSkeleton />;
   // Remount the form whenever we navigate here with new prefill data.
-  return <RunForm key={location.key} prefill={prefill} />;
+  return <RunForm key={location.key} prefill={prefill} settings={settings.data ?? NO_SETTINGS} />;
 }
 
-function buildDefaults(prefill?: RunPrefill): RunFormValues {
-  const targets: TargetValues = { ...initialTargets(), ...prefill?.targets };
+const NO_SETTINGS: TeamSettings = {
+  sms_tester_number: '',
+  voice_from_number: '',
+  voice_tester_agent_id: '',
+  chat_location_id: '',
+};
+
+function RunSkeleton() {
+  return (
+    <div aria-label="Loading" className="space-y-4">
+      <Skeleton className="h-7 w-40" />
+      <Skeleton className="h-56 rounded-xl" />
+      <Skeleton className="h-96 rounded-xl" />
+    </div>
+  );
+}
+
+function buildDefaults(settings: TeamSettings, prefill?: RunPrefill): RunFormValues {
+  const targets: TargetValues = { ...initialTargets(settings), ...prefill?.targets };
   return {
     channel: prefill?.channel ?? getLastRun().channel,
     ...targets,
@@ -79,8 +100,8 @@ function toStartInput(v: RunFormValues): StartTestInput {
   }
 }
 
-function RunForm({ prefill }: { prefill?: RunPrefill }) {
-  const defaultValues = useMemo(() => buildDefaults(prefill), [prefill]);
+function RunForm({ prefill, settings }: { prefill?: RunPrefill; settings: TeamSettings }) {
+  const defaultValues = useMemo(() => buildDefaults(settings, prefill), [settings, prefill]);
   const form = useForm<RunFormValues>({
     resolver: zodResolver(runFormSchema),
     defaultValues,
@@ -252,7 +273,7 @@ function TargetFields({ channel }: { channel: Channel }) {
           tel
           label="Tester number"
           placeholder="+15550001111"
-          hint="Our ClickSend number the AI customer texts from."
+          hint="Our ClickSend number. Filled from the team Settings."
         />
         <TextField
           name="sms_bot"
@@ -274,7 +295,7 @@ function TargetFields({ channel }: { channel: Channel }) {
           tel
           label="From number"
           placeholder="+15550001111"
-          hint="Our Retell number the AI customer calls from."
+          hint="Our Retell number. Filled from the team Settings."
         />
         <TextField
           name="voice_to"
@@ -288,7 +309,7 @@ function TargetFields({ channel }: { channel: Channel }) {
           optional
           label="Tester agent ID"
           placeholder="agent_…"
-          hint="Retell agent that plays the customer. Leave empty to use the default."
+          hint="Retell agent that plays the customer. Filled from the team Settings."
         />
       </div>
     );

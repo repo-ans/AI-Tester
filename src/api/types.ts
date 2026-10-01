@@ -120,6 +120,18 @@ export interface StartTestResult {
   contact_id?: string;
 }
 
+/** Team-wide defaults that pre-fill the Run test form (one shared row). */
+export interface TeamSettings {
+  sms_tester_number: string;
+  voice_from_number: string;
+  voice_tester_agent_id: string;
+  chat_location_id: string;
+  updated_at?: string | null;
+  updated_by?: string | null;
+}
+
+export type TeamSettingsInput = Omit<TeamSettings, 'updated_at' | 'updated_by'>;
+
 /** Maps each action to its request payload and response data. */
 export interface ApiActions {
   list_sessions: { req: { channel?: '' | Channel; limit?: number }; res: SessionRow[] };
@@ -129,6 +141,8 @@ export interface ApiActions {
   list_scenarios: { req: Record<string, never>; res: Scenario[] };
   save_scenario: { req: { scenario: ScenarioInput }; res: Scenario | null };
   delete_scenario: { req: { id: number }; res: { deleted: 0 | 1 } };
+  get_settings: { req: Record<string, never>; res: TeamSettings };
+  save_settings: { req: { settings: TeamSettingsInput }; res: TeamSettings };
 }
 
 export type ApiAction = keyof ApiActions;

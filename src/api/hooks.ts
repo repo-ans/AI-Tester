@@ -1,11 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
-import type { Channel, ScenarioInput, StartTestInput } from './client';
+import type { Channel, ScenarioInput, StartTestInput, TeamSettingsInput } from './client';
 
 export const queryKeys = {
   sessions: (channel: '' | Channel) => ['sessions', channel] as const,
   session: (id: number) => ['session', id] as const,
   scenarios: ['scenarios'] as const,
+  settings: ['settings'] as const,
 };
 
 const SESSION_LIMIT = 200;
@@ -69,5 +70,21 @@ export function useDeleteScenario() {
   return useMutation({
     mutationFn: (id: number) => api('delete_scenario', { id }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.scenarios }),
+  });
+}
+
+export function useTeamSettings() {
+  return useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: () => api('get_settings'),
+    staleTime: 60_000,
+  });
+}
+
+export function useSaveTeamSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: TeamSettingsInput) => api('save_settings', { settings }),
+    onSuccess: (saved) => qc.setQueryData(queryKeys.settings, saved),
   });
 }
