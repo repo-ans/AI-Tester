@@ -7,7 +7,7 @@ import type { Channel, StartTestInput, TeamSettings } from '@/api/client';
 import { useSaveScenario, useScenarios, useStartTest, useTeamSettings } from '@/api/hooks';
 import { PageHeader } from '@/components/Layout';
 import { BotStartsCheckbox } from '@/components/BotStartsCheckbox';
-import { ScenarioFields } from '@/components/ScenarioFields';
+import { ScenarioInput } from '@/components/ScenarioInput';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { Field, Input, Select } from '@/components/ui/Field';
@@ -161,11 +161,11 @@ function RunForm({ prefill, settings }: { prefill?: RunPrefill; settings: TeamSe
         <Card>
           <CardHeader
             title="2. What should the AI customer do?"
-            description="Describe the customer, their goal, and what the judge should check."
+            description="Paste the test from your AI, or load a saved scenario."
             actions={<LoadScenario channel={channel} />}
           />
           <div className="px-4 py-4 sm:px-5">
-            <ScenarioFields />
+            <ScenarioInput />
           </div>
         </Card>
 

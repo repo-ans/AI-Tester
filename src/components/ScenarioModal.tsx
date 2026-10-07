@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { Scenario } from '@/api/client';
 import { useSaveScenario } from '@/api/hooks';
 import { BotStartsCheckbox } from '@/components/BotStartsCheckbox';
-import { ScenarioFields } from '@/components/ScenarioFields';
+import { ScenarioInput } from '@/components/ScenarioInput';
 import { Button } from '@/components/ui/Button';
 import { Field, Select } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -89,7 +89,7 @@ function ScenarioForm({ scenario, onDone }: { scenario: Scenario | null; onDone:
           )}
         </Field>
         {botStartsApplies(channel) && <BotStartsCheckbox />}
-        <ScenarioFields />
+        <ScenarioInput defaultOpen={scenario !== null} />
         <div className="flex justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
           <Button onClick={onDone}>Cancel</Button>
           <Button type="submit" variant="primary" loading={save.isPending}>
