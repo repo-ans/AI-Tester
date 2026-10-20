@@ -150,8 +150,27 @@ the channel's target fields plus the scenario:
 | Chat    | `/ai-tester/chat/start`  | `{ location_id, message_type, conversation_provider_id, scenario }` |
 
 `scenario` is `{ name, persona, goal, checks, max_turns, bot_starts? }`. `bot_starts: true` is sent
-for SMS only, when "Bot sends the first message" is ticked. Each workflow must reply
-`{ "session_id": <id> }`.
+when the bot starts the conversation: for SMS, "Bot sends the first message"; for voice, "Bot calls us
+(outbound agent)". Each workflow must reply `{ "session_id": <id> }`.
+
+### Outbound voice tests (the bot calls us)
+
+The ready-to-import voice workflow is [`n8n/ai-tester-voice-retell.json`](n8n/ai-tester-voice-retell.json).
+With `bot_starts`, Start test only creates the test and waits. The client's outbound bot then calls our
+Retell tester number, and Retell asks `/webhook/ai-tester/voice/inbound` who should answer. n8n finds the
+waiting test for that number and hands Retell the **answering agent** (Settings → "Retell answering agent
+ID") with the test's persona and goal. When the call ends, the normal judge path grades it.
+
+One-time setup:
+
+1. Run `supabase/dashboard.sql` again (adds `voice_answer_agent_id`).
+2. Retell (the tester's workspace) → duplicate **AI Tester Customer** → name it **AI Tester Customer
+   (Answer)** → Welcome message **AI speaks first** (e.g. "Hello?"). Keep the same agent-level webhook
+   URL. Publish it and put its ID in the dashboard's Settings.
+3. Retell → Phone Numbers → the tester number → tick **Add an inbound webhook** →
+   `https://<n8n>/webhook/ai-tester/voice/inbound`. With no waiting test, the number's normal inbound
+   agent still answers.
+4. Import the workflow JSON in n8n (replacing the old voice workflow), check the credentials, publish.
 
 The browser calls n8n from another domain, so **each start webhook** must allow it:
 

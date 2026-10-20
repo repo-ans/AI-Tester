@@ -46,6 +46,7 @@ const NO_SETTINGS: TeamSettings = {
   sms_tester_number: '',
   voice_from_number: '',
   voice_tester_agent_id: '',
+  voice_answer_agent_id: '',
   chat_location_id: '',
 };
 
@@ -83,7 +84,10 @@ function toStartInput(v: RunFormValues): StartTestInput {
         target: {
           from_number: cleanPhone(v.voice_from),
           to_number: cleanPhone(v.voice_to),
-          ...(v.voice_agent.trim() ? { tester_agent_id: v.voice_agent.trim() } : {}),
+          // Outbound tests: the answering agent is chosen in n8n from the team Settings.
+          ...(v.voice_agent.trim() && !v.bot_starts
+            ? { tester_agent_id: v.voice_agent.trim() }
+            : {}),
         },
         scenario,
       };
@@ -134,7 +138,7 @@ function RunForm({ prefill, settings }: { prefill?: RunPrefill; settings: TeamSe
       {
         ...fromScenarioFields(values),
         channel: values.channel,
-        bot_starts: values.channel === 'sms' && values.bot_starts,
+        bot_starts: values.channel !== 'chat' && values.bot_starts,
       },
       { onSuccess: (s) => toast.success(`Saved scenario "${s?.name ?? values.name}"`) },
     );
@@ -263,7 +267,8 @@ function TextField({ name, label, hint, placeholder, optional, tel }: TextFieldP
 }
 
 function TargetFields({ channel }: { channel: Channel }) {
-  const { register } = useFormContext<RunFormValues>();
+  const { register, control } = useFormContext<RunFormValues>();
+  const botCalls = useWatch({ control, name: 'bot_starts' });
 
   if (channel === 'sms') {
     return (
@@ -282,7 +287,7 @@ function TargetFields({ channel }: { channel: Channel }) {
           placeholder="+15550002222"
           hint="The client's GHL number the bot answers on."
         />
-        <BotStartsCheckbox className="sm:col-span-2" />
+        <BotStartsCheckbox channel="sms" className="sm:col-span-2" />
       </div>
     );
   }
@@ -290,27 +295,39 @@ function TargetFields({ channel }: { channel: Channel }) {
   if (channel === 'voice') {
     return (
       <div className="grid gap-4 sm:grid-cols-2">
+        <BotStartsCheckbox channel="voice" className="sm:col-span-2" />
         <TextField
           name="voice_from"
           tel
-          label="From number"
+          label={botCalls ? 'Tester number (bot calls this)' : 'From number'}
           placeholder="+15550001111"
-          hint="Our Retell number. Filled from the team Settings."
+          hint={
+            botCalls
+              ? 'Our Retell number. Make the bot call this number after you click Start test.'
+              : 'Our Retell number. Filled from the team Settings.'
+          }
         />
         <TextField
           name="voice_to"
           tel
-          label="Bot number"
+          optional={botCalls}
+          label={botCalls ? "Bot's number" : 'Bot number'}
           placeholder="+15550002222"
-          hint="The client's voice agent number to call."
+          hint={
+            botCalls
+              ? 'The number the bot calls from. Only shown on the results.'
+              : "The client's voice agent number to call."
+          }
         />
-        <TextField
-          name="voice_agent"
-          optional
-          label="Tester agent ID"
-          placeholder="agent_…"
-          hint="Retell agent that plays the customer. Filled from the team Settings."
-        />
+        {!botCalls && (
+          <TextField
+            name="voice_agent"
+            optional
+            label="Tester agent ID"
+            placeholder="agent_…"
+            hint="Retell agent that plays the customer. Filled from the team Settings."
+          />
+        )}
       </div>
     );
   }

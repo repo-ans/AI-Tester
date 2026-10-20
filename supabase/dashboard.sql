@@ -134,3 +134,8 @@ drop trigger if exists ai_test_settings_touch on public.ai_test_settings;
 create trigger ai_test_settings_touch
   before update on public.ai_test_settings
   for each row execute function public.ai_test_touch_updated_at();
+
+-- 6. Outbound voice tests: the Retell agent that ANSWERS when a client's
+-- outbound bot calls our tester number.
+alter table public.ai_test_settings
+  add column if not exists voice_answer_agent_id text not null default '';

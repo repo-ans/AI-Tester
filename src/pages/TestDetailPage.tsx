@@ -101,7 +101,10 @@ function Header({ session, messages }: { session: Session; messages: Message[] }
   const duration =
     result?.extra?.duration_sec ??
     (session.channel === 'voice' ? secondsBetween(session.created_at, session.finished_at) : null);
-  const target = session.channel === 'chat' ? `Location ${session.bot_number}` : session.bot_number;
+  const target =
+    session.channel === 'chat'
+      ? `Location ${session.bot_number}`
+      : session.bot_number || 'Not given (outbound)';
 
   async function copyTranscript() {
     const text = transcriptText(session, messages);
@@ -338,7 +341,13 @@ function ScenarioCard({ session }: { session: Session }) {
     <Card>
       <CardHeader
         title="Scenario"
-        description={bot_starts ? 'The bot sends the first message.' : undefined}
+        description={
+          bot_starts
+            ? session.channel === 'voice'
+              ? 'Outbound: the bot calls our tester number.'
+              : 'The bot sends the first message.'
+            : undefined
+        }
       />
       <div className="space-y-4 px-4 py-4 sm:px-5">
         {persona && (
@@ -385,7 +394,13 @@ function Conversation({ session, messages, running }: ConversationProps) {
     if (box) box.scrollTop = box.scrollHeight;
   }, [messages.length, running]);
 
-  const voiceLive = running && session.channel === 'voice';
+  // Outbound voice: until the bot's call reaches our number (n8n then sets external_ref).
+  const waitingForBotCall =
+    running &&
+    session.channel === 'voice' &&
+    session.scenario.bot_starts === true &&
+    !session.external_ref;
+  const voiceLive = running && session.channel === 'voice' && !waitingForBotCall;
   const awaitingBotOpener =
     running && messages.length === 0 && session.scenario.bot_starts === true;
   const last = messages[messages.length - 1];
@@ -414,7 +429,22 @@ function Conversation({ session, messages, running }: ConversationProps) {
         {messages.map((m, i) => (
           <Bubble key={i} message={m} />
         ))}
-        {voiceLive ? (
+        {waitingForBotCall ? (
+          <div className="flex flex-col items-center gap-2 px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+            <Phone className="size-5 animate-pulse text-accent-500" aria-hidden />
+            <p>
+              Waiting for the bot to call{' '}
+              <strong className="font-medium text-zinc-800 dark:text-zinc-200">
+                {session.tester_number}
+              </strong>
+              …
+            </p>
+            <p className="max-w-sm text-xs">
+              Start the outbound call now, e.g. the bot's Test Audio → Phone Call → Outbound, or
+              Retell → Phone Numbers → Make an outbound call.
+            </p>
+          </div>
+        ) : voiceLive ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
             <Phone className="size-5 animate-pulse text-accent-500" aria-hidden />
             Call in progress — the transcript arrives when the call ends.

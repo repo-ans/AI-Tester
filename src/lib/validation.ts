@@ -53,7 +53,10 @@ export function toScenarioFields(s: SessionScenario): ScenarioFieldValues {
   };
 }
 
-/** Scenario payload for start_test. `bot_starts: true` is only sent for SMS. */
+/**
+ * Scenario payload for start_test. `bot_starts: true` is sent for SMS (bot texts
+ * first) and voice (outbound bot calls our tester number).
+ */
 export function fromScenarioFields(
   v: ScenarioFieldValues,
   channel?: ScenarioChannel,
@@ -64,13 +67,15 @@ export function fromScenarioFields(
     goal: v.goal.trim(),
     checks: v.checks.map((c) => c.value.trim()).filter(Boolean),
     max_turns: v.max_turns,
-    ...(v.bot_starts && channel === 'sms' ? { bot_starts: true as const } : {}),
+    ...(v.bot_starts && (channel === 'sms' || channel === 'voice')
+      ? { bot_starts: true as const }
+      : {}),
   };
 }
 
-/** bot_starts only applies to SMS (and "any" scenarios, which can run on SMS). */
+/** bot_starts applies to SMS and voice (and "any" scenarios, which can run on either). */
 export function botStartsApplies(channel: ScenarioChannel): boolean {
-  return channel === 'sms' || channel === 'any';
+  return channel !== 'chat';
 }
 
 // ---------- Run form ----------
@@ -84,6 +89,11 @@ const REQUIRED_TARGETS = {
   voice: { voice_from: phone('From number'), voice_to: phone('Bot number') },
   chat: { chat_location: text('Location ID') },
 } as const;
+
+/** When an outbound voice bot calls us, its own number is optional (shown on results only). */
+function isOptional(channel: 'sms' | 'voice' | 'chat', field: string, botStarts: boolean) {
+  return channel === 'voice' && field === 'voice_to' && botStarts;
+}
 
 export const runFormSchema = scenarioFieldsSchema
   .extend({
@@ -102,6 +112,7 @@ export const runFormSchema = scenarioFieldsSchema
       const raw = v[field as keyof typeof v];
       const value = typeof raw === 'string' ? raw.trim() : '';
       if (!value) {
+        if (isOptional(v.channel, field, v.bot_starts)) continue;
         ctx.addIssue({ code: 'custom', path: [field], message: `${rule.label} is required` });
       } else if (rule.phone && !E164.test(cleanPhone(value))) {
         ctx.addIssue({

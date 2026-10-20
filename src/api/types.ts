@@ -125,6 +125,8 @@ export interface TeamSettings {
   sms_tester_number: string;
   voice_from_number: string;
   voice_tester_agent_id: string;
+  /** Retell agent that answers when an outbound bot calls our tester number. */
+  voice_answer_agent_id: string;
   chat_location_id: string;
   updated_at?: string | null;
   updated_by?: string | null;

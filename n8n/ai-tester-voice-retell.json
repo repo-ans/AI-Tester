@@ -1,0 +1,643 @@
+{
+  "name": "AI Tester - Voice (Retell)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## AI Tester: Voice (Retell)\n**Inbound bots** (tester calls the bot): POST `/webhook/ai-tester/voice/start` → Retell Create Call.\n**Outbound bots** (bot calls us, `scenario.bot_starts = true`): start only creates the test and waits. The bot calls our tester number; Retell asks `/webhook/ai-tester/voice/inbound` who answers → the answering agent gets the persona.\n**Call ended**: Retell → `/webhook/ai-tester/voice/retell` (agent-level webhook on BOTH tester agents) → judge.\n\n**Setup**\n1. Supabase: run `supabase/dashboard.sql` (adds `voice_answer_agent_id`)\n2. Retell (AniyaNetworks) → tester number → tick \"Add an inbound webhook\" → `/webhook/ai-tester/voice/inbound`\n3. Retell: duplicate \"AI Tester Customer\" → \"AI Tester Customer (Answer)\", Welcome message = AI speaks first. Put its ID in dashboard Settings.\n4. Credentials: Postgres, OpenAI, Retell Header Auth. Publish.",
+        "height": 520,
+        "width": 640
+      },
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -200
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000001"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-tester/voice/start",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Start Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        80,
+        528
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000002",
+      "webhookId": "1588f7d7-77ea-5b45-92ed-d29c1a0242df"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai_test_sessions (channel, scenario, tester_number, bot_number, meta)\nVALUES ('voice', $1::jsonb, $2, $3, $4::jsonb)\nRETURNING id;",
+        "options": {
+          "queryReplacement": "={{ [ JSON.stringify($json.body.scenario), $json.body.from_number, $json.body.to_number || '', JSON.stringify({ tester_agent_id: $json.body.tester_agent_id || null, outbound: $json.body.scenario?.bot_starts === true }) ] }}"
+        }
+      },
+      "name": "Create Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        304,
+        528
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000003",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "b0b0b0b0-0000-4000-8000-000000000001",
+              "leftValue": "={{ $('Start Test').first().json.body.scenario?.bot_starts === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Bot Calls Us?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        528,
+        528
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000004"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { session_id: $json.id, waiting_for_call: true } }}",
+        "options": {}
+      },
+      "name": "Respond Waiting",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        752,
+        336
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000005"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Start Test').first().json.body;\nconst s = body.scenario || {};\nconst sessionId = $input.first().json.id;\nconst call = {\n  from_number: body.from_number,\n  to_number: body.to_number,\n  metadata: { ai_test_session_id: String(sessionId) },\n  retell_llm_dynamic_variables: {\n    persona: s.persona || 'A regular customer.',\n    goal: s.goal || 'Get your question answered.',\n    scenario_name: s.name || ''\n  }\n};\nif (body.tester_agent_id) call.override_agent_id = body.tester_agent_id;\nreturn [{ json: { session_id: sessionId, retell_body: call } }];"
+      },
+      "name": "Prepare Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        528
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000006"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.retellai.com/v2/create-phone-call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.retell_body) }}",
+        "options": {}
+      },
+      "name": "Retell Create Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        976,
+        528
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000007",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "fWXA33KGiudW5guF",
+          "name": "Retell Auth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ai_test_sessions SET external_ref = $2 WHERE id = $1::bigint RETURNING id AS session_id, external_ref AS call_id;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Call').first().json.session_id, $json.call_id ] }}"
+        }
+      },
+      "name": "Save Call ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        448
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000008",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { session_id: $json.session_id, call_id: $json.call_id } }}",
+        "options": {}
+      },
+      "name": "Respond Session",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        448
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000009"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ai_test_sessions\nSET status = 'failed', finished_at = now(),\n    result = jsonb_build_object('overall_pass', false, 'score', 0, 'end_reason', 'call_create_failed',\n             'summary', 'Retell could not start the call: ' || $2::text)\nWHERE id = $1::bigint\nRETURNING id, $2::text AS reason;",
+        "options": {
+          "queryReplacement": "={{ [ $('Prepare Call').first().json.session_id, $json.error?.description || $json.error?.message || $json.message || 'unknown error' ] }}"
+        }
+      },
+      "name": "Mark Call Failed",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1200,
+        640
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000010",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { message: 'Retell: ' + $json.reason } }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1424,
+        640
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000011"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-tester/voice/inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Retell Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        80,
+        1248
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000012",
+      "webhookId": "c7e1d2a4-5b6f-4c3d-9e8a-7f6b5a4c3d21"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH s AS (\n  SELECT id FROM ai_test_sessions\n  WHERE channel = 'voice' AND status = 'running' AND external_ref IS NULL\n    AND (scenario->>'bot_starts')::boolean IS TRUE\n    AND regexp_replace(tester_number, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')\n  ORDER BY id DESC\n  LIMIT 1\n  FOR UPDATE SKIP LOCKED\n)\nUPDATE ai_test_sessions t\nSET external_ref = 'inbound:' || $2,\n    bot_number = CASE WHEN coalesce(t.bot_number, '') = '' THEN $2 ELSE t.bot_number END\nFROM s\nWHERE t.id = s.id\nRETURNING t.id AS session_id, t.scenario,\n  (SELECT voice_answer_agent_id FROM ai_test_settings WHERE id = 1) AS answer_agent_id;",
+        "options": {
+          "queryReplacement": "={{ [ $json.body.call_inbound?.to_number || '', $json.body.call_inbound?.from_number || '' ] }}"
+        }
+      },
+      "name": "Claim Waiting Test",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        304,
+        1248
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000013",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// No waiting test for this number -> empty answer: Retell uses the number's normal inbound agent.\nconst r = $input.first().json;\nif (!r.session_id) return [{ json: { call_inbound: {} } }];\nconst s = r.scenario || {};\nconst call_inbound = {\n  dynamic_variables: {\n    persona: String(s.persona || 'A regular customer.'),\n    goal: String(s.goal || 'Get your question answered.'),\n    scenario_name: String(s.name || '')\n  },\n  metadata: { ai_test_session_id: String(r.session_id) }\n};\nif (r.answer_agent_id) call_inbound.override_agent_id = r.answer_agent_id;\nreturn [{ json: { call_inbound } }];"
+      },
+      "name": "Build Inbound Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        1248
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000014"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond Inbound",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        752,
+        1248
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000015"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-tester/voice/retell",
+        "options": {}
+      },
+      "name": "Retell Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        80,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000016",
+      "webhookId": "33c441ca-3538-54dd-b250-315c81ddac68"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only our test calls' 'call_ended' events (they carry ai_test_session_id)\nconst b = $input.first().json.body || {};\nconst call = b.call || {};\nconst sid = call.metadata?.ai_test_session_id;\nif (b.event !== 'call_ended' || !sid) return [];\nreturn [{ json: { session_id: sid, call } }];"
+      },
+      "name": "Only Tester Call Ended",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000017"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.id AS session_id, s.channel, s.scenario, s.tester_number, s.bot_number,\n  s.external_ref, s.meta, s.turns, s.status,\n  COALESCE((SELECT json_agg(json_build_object('role', role, 'content', content) ORDER BY id)\n     FROM ai_test_messages WHERE session_id = s.id), '[]'::json) AS history\nFROM ai_test_sessions s WHERE s.id = $1::bigint;",
+        "options": {
+          "queryReplacement": "={{ [ $json.session_id ] }}"
+        }
+      },
+      "name": "Load Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        528,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000018",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\n// Grade calls that really happened, even if someone pressed Stop meanwhile.\nif (!r.session_id || !['running', 'aborted'].includes(r.status)) return [];\nconst call = $('Only Tester Call Ended').first().json.call;\n\n// Our agent (tester or answering agent) = CUSTOMER; the other side = the client's BOT\nlet history = (call.transcript_object || []).map(t => ({\n  role: t.role === 'agent' ? 'tester' : 'bot',\n  content: t.content\n}));\nif (!history.length && call.transcript) {\n  history = call.transcript.split('\\n').filter(Boolean).map(l => ({\n    role: l.startsWith('Agent:') ? 'tester' : 'bot',\n    content: l.replace(/^(Agent|User):\\s*/, '')\n  }));\n}\nconst durSec = call.end_timestamp && call.start_timestamp\n  ? Math.round((call.end_timestamp - call.start_timestamp) / 1000) : null;\n\nreturn [{ json: {\n  session_id: r.session_id,\n  channel: 'voice',\n  scenario: r.scenario,\n  turns: history.filter(h => h.role === 'tester').length,\n  history,\n  end_reason: call.disconnection_reason || 'call_ended',\n  extra: { call_id: call.call_id, duration_sec: durSec, recording_url: call.recording_url || null }\n}}];"
+      },
+      "name": "Build Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000019"
+    },
+    {
+      "parameters": {
+        "jsCode": "const c = $input.first().json;\nconst s = c.scenario || {};\nconst transcript = (c.history || [])\n  .map(m => (m.role === 'tester' ? 'CUSTOMER' : 'BOT') + ': ' + m.content)\n  .join('\\n');\nconst checks = (s.checks || []).map((x, i) => (i + 1) + '. ' + x).join('\\n');\nconst outbound = s.bot_starts === true;\nconst channelNote = 'The conversation was a PHONE CALL; the transcript comes from speech-to-text, so ignore small transcription errors.'\n  + (outbound ? ' This was an OUTBOUND call: the BOT phoned the CUSTOMER.' : '');\n\nconst system = [\n  'You are a strict QA evaluator for customer-facing AI assistants.',\n  'You read a conversation between a simulated CUSTOMER and a business BOT and grade the BOT only.',\n  channelNote,\n  'Be objective. A check passes only if the transcript clearly shows it.',\n  'If the transcript is empty or the bot never replied, the test fails.',\n  'For every check that fails, the \"reason\" must quote the BOT\\'s exact words from the transcript (or say \"the bot never said/did this\").',\n  'Return ONLY valid JSON in this shape:',\n  '{',\n  '  \"overall_pass\": true/false,',\n  '  \"score\": 0-100,',\n  '  \"goal_achieved\": true/false,',\n  '  \"checks\": [{\"check\": \"...\", \"pass\": true/false, \"reason\": \"...\"}],',\n  '  \"issues\": [\"short description of each problem found\"],',\n  '  \"summary\": \"2-3 sentence summary\"',\n  '}'\n].join('\\n');\n\nconst user = [\n  'SCENARIO: ' + (s.name || ''),\n  'CUSTOMER PERSONA: ' + (s.persona || ''),\n  'CUSTOMER GOAL: ' + (s.goal || ''),\n  'TEST ENDED BECAUSE: ' + c.end_reason,\n  '',\n  'CHECKS TO GRADE:',\n  checks || '(none given - judge general quality: accuracy, politeness, stays on task, no hallucination)',\n  '',\n  'TRANSCRIPT:',\n  transcript || '(empty)'\n].join('\\n');\n\nreturn [{ json: { ...c, transcript, openai_body: {\n  model: s.judge_model || 'gpt-4o',\n  temperature: 0,\n  response_format: { type: 'json_object' },\n  messages: [{ role: 'system', content: system }, { role: 'user', content: user }]\n}}}];"
+      },
+      "name": "Build Judge Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000020"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openai_body) }}",
+        "options": {}
+      },
+      "name": "Judge AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000021",
+      "credentials": {
+        "openAiApi": {
+          "id": "fj3WhBV98VkK9qr3",
+          "name": "Manam- OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build Judge Request').first().json;\nlet result;\ntry {\n  result = JSON.parse($input.first().json.choices[0].message.content);\n} catch (e) {\n  result = { overall_pass: false, score: 0, summary: 'Judge output parse failed', raw: $input.first().json };\n}\nresult.end_reason = ctx.end_reason;\nresult.turns = ctx.turns;\nresult.transcript = ctx.transcript;\nif (ctx.extra) result.extra = ctx.extra;\nreturn [{ json: {\n  session_id: ctx.session_id,\n  status: result.overall_pass ? 'passed' : 'failed',\n  history: ctx.history || [],\n  result\n}}];"
+      },
+      "name": "Parse Judge Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000022"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH ins AS (\n  INSERT INTO ai_test_messages (session_id, role, content)\n  SELECT $1::bigint, x->>'role', x->>'content' FROM jsonb_array_elements($4::jsonb) x\n  RETURNING 1\n)\nUPDATE ai_test_sessions\nSET status = $2, result = $3::jsonb, turns = (SELECT count(*) FROM ins), finished_at = now()\nWHERE id = $1::bigint\nRETURNING id, channel, status, (result->>'score')::int AS score;",
+        "options": {
+          "queryReplacement": "={{ [ $json.session_id, $json.status, JSON.stringify($json.result), JSON.stringify($json.history) ] }}"
+        }
+      },
+      "name": "Save Result + Transcript",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1648,
+        896
+      ],
+      "id": "a1b2c3d4-0000-4000-8000-000000000023",
+      "credentials": {
+        "postgres": {
+          "id": "ageOo9Pvu6vusAYd",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start Test": {
+      "main": [
+        [
+          {
+            "node": "Create Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Session": {
+      "main": [
+        [
+          {
+            "node": "Bot Calls Us?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot Calls Us?": {
+      "main": [
+        [
+          {
+            "node": "Respond Waiting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Call": {
+      "main": [
+        [
+          {
+            "node": "Retell Create Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retell Create Call": {
+      "main": [
+        [
+          {
+            "node": "Save Call ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Call Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Call ID": {
+      "main": [
+        [
+          {
+            "node": "Respond Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Call Failed": {
+      "main": [
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retell Inbound": {
+      "main": [
+        [
+          {
+            "node": "Claim Waiting Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim Waiting Test": {
+      "main": [
+        [
+          {
+            "node": "Build Inbound Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Inbound Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Inbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retell Webhook": {
+      "main": [
+        [
+          {
+            "node": "Only Tester Call Ended",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only Tester Call Ended": {
+      "main": [
+        [
+          {
+            "node": "Load Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Session": {
+      "main": [
+        [
+          {
+            "node": "Build Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Transcript": {
+      "main": [
+        [
+          {
+            "node": "Build Judge Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Judge Request": {
+      "main": [
+        [
+          {
+            "node": "Judge AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge AI": {
+      "main": [
+        [
+          {
+            "node": "Parse Judge Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Judge Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result + Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

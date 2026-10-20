@@ -112,11 +112,12 @@ type Handlers = {
 const SESSION_COLUMNS =
   'id, channel, status, turns, scenario, result, tester_number, bot_number, external_ref, created_at, finished_at';
 const SETTINGS_COLUMNS =
-  'sms_tester_number, voice_from_number, voice_tester_agent_id, chat_location_id, updated_at, updated_by';
+  'sms_tester_number, voice_from_number, voice_tester_agent_id, voice_answer_agent_id, chat_location_id, updated_at, updated_by';
 const EMPTY_SETTINGS: TeamSettings = {
   sms_tester_number: '',
   voice_from_number: '',
   voice_tester_agent_id: '',
+  voice_answer_agent_id: '',
   chat_location_id: '',
 };
 const SCENARIO_COLUMNS =

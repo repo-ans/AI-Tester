@@ -26,6 +26,7 @@ const schema = z.object({
   sms_tester_number: optionalPhone,
   voice_from_number: optionalPhone,
   voice_tester_agent_id: z.string().trim(),
+  voice_answer_agent_id: z.string().trim(),
   chat_location_id: z.string().trim(),
 });
 
@@ -71,6 +72,7 @@ const EMPTY_FORM: TeamSettingsInput = {
   sms_tester_number: '',
   voice_from_number: '',
   voice_tester_agent_id: '',
+  voice_answer_agent_id: '',
   chat_location_id: '',
 };
 
@@ -88,6 +90,7 @@ function DefaultsForm({ initial }: { initial: TeamSettings | undefined }) {
           sms_tester_number: initial.sms_tester_number,
           voice_from_number: initial.voice_from_number,
           voice_tester_agent_id: initial.voice_tester_agent_id,
+          voice_answer_agent_id: initial.voice_answer_agent_id ?? '',
           chat_location_id: initial.chat_location_id,
         }
       : EMPTY_FORM,
@@ -143,6 +146,12 @@ function DefaultsForm({ initial }: { initial: TeamSettings | undefined }) {
           'voice_tester_agent_id',
           'Retell tester agent ID',
           'The Retell agent that plays the customer.',
+          'agent_…',
+        )}
+        {field(
+          'voice_answer_agent_id',
+          'Retell answering agent ID',
+          'Answers when an outbound bot calls our tester number (a copy of the tester agent that says “Hello?” first).',
           'agent_…',
         )}
         {field(
